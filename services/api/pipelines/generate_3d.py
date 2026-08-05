@@ -138,9 +138,18 @@ def run_generate_3d_pipeline(
             image=input_path,
             prompt=prompt,
         )
-        multiview_images = [styled_image]
 
-        # 2. Generate a 3D mesh from the styled reference image.
+        # 2. Generate multi-view renders from the styled front view.
+        update_job_status(job_id, JobStatus.GENERATING_MULTIVIEW, status_message="Generating multi-view images")
+        multiview_images = image_provider.generate_multiview_from_image(
+            image=styled_image,
+            prompt=prompt,
+            num_views=4,
+        )
+        if not multiview_images:
+            multiview_images = [styled_image]
+
+        # 3. Generate a 3D mesh from the multi-view reference images.
         update_job_status(job_id, JobStatus.GENERATING_3D, status_message="Generating 3D mesh")
         result_mesh = result_path(job_id, "model.glb")
         mesh_asset = three_d_provider.generate_3d_from_images(

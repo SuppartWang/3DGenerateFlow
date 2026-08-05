@@ -26,10 +26,12 @@ except ImportError:  # pragma: no cover
     torch = None  # type: ignore
 
 try:
-    from diffusers import StableDiffusionImg2ImgPipeline
+    from diffusers import StableDiffusionImg2ImgPipeline, Zero123Pipeline
     _HAS_DIFFUSERS = True
+    _HAS_ZERO123 = True
 except ImportError:  # pragma: no cover
     _HAS_DIFFUSERS = False
+    _HAS_ZERO123 = False
 
 try:
     from transformers import pipeline
@@ -136,11 +138,78 @@ class ROCmStyleProvider(ImageProvider):
         result.save(out_path)
         return out_path
 
-    def generate_multiview_from_image(self, image: Path, prompt: str, num_views: int = 4) -> List[Path]:
-        # TODO: replace with Zero123 / MVDream / SyncDreamer when a ROCm-compatible checkpoint is wired in.
-        warnings.warn("ROCm multiview generation not implemented yet; returning single image")
-        return [image]
+    def _center_crop_resize(self, img: Image.Image, size: int) -> Image.Image:
+        """Center-crop to a square and resize to `size` while keeping aspect ratio."""
+        w, h = img.size
+        if w != h:
+            min_dim = min(w, h)
+            left = (w - min_dim) // 2
+            top = (h - min_dim) // 2
+            img = img.crop((left, top, left + min_dim, top + min_dim))
+        if img.size != (size, size):
+            img = img.resize((size, size), Image.Resampling.LANCZOS)
+        return img
 
+    _zero123_pipe = None
+
+    def _load_zero123_pipeline(self):
+        if self._zero123_pipe is not None:
+            return self._zero123_pipe
+        if not _HAS_DIFFUSERS or not _HAS_TORCH or not _HAS_ZERO123:
+            raise RuntimeError("Zero123 pipeline is not available")
+
+        dtype = torch.float16 if self.device == "cuda" else torch.float32  # type: ignore
+        pipe = Zero123Pipeline.from_pretrained(
+            "ashawkey/zero123-xl-diffusers",
+            torch_dtype=dtype,
+            cache_dir=self.cache_dir,
+        )
+        pipe = pipe.to(self.device)  # type: ignore
+        if self.device == "cuda":
+            try:
+                pipe.enable_model_cpu_offload()
+            except Exception:
+                pass
+        self._zero123_pipe = pipe
+        return pipe
+
+    def generate_multiview_from_image(self, image: Path, prompt: str, num_views: int = 4) -> List[Path]:
+        """Generate multi-view renderings from a single front-facing image using Zero123.
+
+        Returns 1 + num_views images: the original front view plus the generated views
+        (right, back, left, ...). If Zero123 is unavailable, falls back to the input image.
+        """
+        if not _HAS_DIFFUSERS or not _HAS_TORCH or not _HAS_ZERO123:
+            warnings.warn("Zero123 not available; falling back to single-image 3D generation")
+            return [image]
+
+        pipe = self._load_zero123_pipeline()
+        init_image = Image.open(image).convert("RGB")
+        init_image = self._center_crop_resize(init_image, 512)
+
+        # Zero123 uses elevation / azimuth in degrees. Front is azimuth 0.
+        views = [
+            ("front", 0, 0),
+            ("right", 0, 90),
+            ("back", 0, 180),
+            ("left", 0, 270),
+        ]
+        views = views[: max(1, num_views)]
+
+        output_paths: List[Path] = []
+        for name, elevation, azimuth in views:
+            out = pipe(
+                init_image,
+                elevation=elevation,
+                azimuth=azimuth,
+                num_inference_steps=50,
+                guidance_scale=5.0,
+            ).images[0]
+            out_path = image.parent / f"view_{name}.png"
+            out.save(out_path)
+            output_paths.append(out_path)
+
+        return output_paths
 
 class ROCmDepthProvider(DepthProvider):
     """Local monocular depth estimation on ROCm (Depth Anything V2)."""

@@ -41,6 +41,9 @@ USE_ROCM = os.environ.get("USE_ROCM", "false").lower() in ("1", "true", "yes")
 USE_HUNYUAN3D = os.environ.get("USE_HUNYUAN3D", "true").lower() in ("1", "true", "yes")
 
 
+USE_HUNYUAN3D_MV = os.environ.get("USE_HUNYUAN3D_MV", "true").lower() in ("1", "true", "yes")
+
+
 def _prefer_rocm() -> bool:
     return USE_ROCM or (_HAS_ROCM and rocm_available())
 
@@ -59,6 +62,11 @@ def get_3d_provider(output_mode: str = "fullcolor_3d") -> ThreeDProvider:
             return ROCmReliefProvider()
         if USE_HUNYUAN3D:
             try:
+                if USE_HUNYUAN3D_MV:
+                    return Hunyuan3D2Provider(
+                        shape_model_path="tencent/Hunyuan3D-2mv",
+                        subfolder="hunyuan3d-dit-v2-mv",
+                    )
                 return Hunyuan3D2Provider()
             except Exception as exc:  # pragma: no cover
                 import warnings

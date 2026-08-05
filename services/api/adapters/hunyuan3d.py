@@ -151,13 +151,11 @@ class Hunyuan3D2Provider(ThreeDProvider):
         output_path: Path | None = None,
         **kwargs,
     ) -> MeshAsset:
-        """Generate a textured 3D mesh from a single reference image.
+        """Generate a 3D mesh from reference image(s).
 
-        Args:
-            images: list of image paths. The first image is used as the reference.
-            prompt: unused for Hunyuan3D-2 image mode (kept for interface compatibility).
-            style: unused for the model itself, but may be used for downstream metadata.
-            output_path: destination path for the exported mesh (default: model.glb next to input).
+        If multiple images are provided and the model is a multi-view variant (subfolder
+        ends with 'mv'), the images are passed as a {front, right, back, left} dict.
+        Otherwise the first image is used for single-image generation.
         """
         if not images:
             raise ValueError("Hunyuan3D-2 requires at least one reference image")
@@ -166,8 +164,18 @@ class Hunyuan3D2Provider(ThreeDProvider):
         if not input_image.exists():
             raise FileNotFoundError(f"Reference image not found: {input_image}")
 
+        if len(images) > 1 and self.subfolder.endswith("mv"):
+            view_names = ["front", "right", "back", "left"]
+            image_input = {
+                name: str(images[i])
+                for i, name in enumerate(view_names)
+                if i < len(images)
+            }
+        else:
+            image_input = str(input_image)
+
         shape_pipe = self._load_shape_pipeline()
-        mesh = shape_pipe(image=str(input_image))[0]
+        mesh = shape_pipe(image=image_input)[0]
 
         if self.enable_texture and _HAS_TEXGEN:
             try:
