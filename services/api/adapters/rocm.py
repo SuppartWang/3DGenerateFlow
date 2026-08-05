@@ -66,7 +66,7 @@ class ROCmStyleProvider(ImageProvider):
         model_id: str = "runwayml/stable-diffusion-v1-5",
         cache_dir: str | None = None,
         device: str = "cuda",
-        max_image_size: int = 768,
+        max_image_size: int = 1024,
     ):
         self.model_id = model_id
         self.cache_dir = cache_dir or _default_cache_dir()
@@ -191,7 +191,8 @@ class ROCmReliefProvider(ThreeDProvider):
     """Generate a 2.5D printable relief mesh from a depth / height map.
 
     This runs entirely on CPU (trimesh/numpy) so it does not consume GPU VRAM. The depth map
-    itself is produced by ROCmDepthProvider.
+    itself is produced by ROCmDepthProvider.  A full-color GLB with the original image baked
+    as a texture is also exported alongside the watertight STL.
     """
 
     name = "rocm_relief"
@@ -205,7 +206,12 @@ class ROCmReliefProvider(ThreeDProvider):
         **kwargs,
     ) -> MeshAsset:
         # For relief generation, the first image is treated as the depth/height map.
-        return self.generate_relief_from_depth(images[0], output_path=output_path, **kwargs)
+        # The second image (if present) is used as the color texture.
+        depth_path = images[0]
+        color_path = images[1] if len(images) > 1 else None
+        return self.generate_relief_from_depth(
+            depth_path, output_path=output_path, color_image=color_path, **kwargs
+        )
 
     def generate_3d_from_text(self, prompt: str, style: str, output_path: Path | None = None) -> MeshAsset:
         raise NotImplementedError("ROCmReliefProvider requires an input depth map image")
@@ -214,6 +220,7 @@ class ROCmReliefProvider(ThreeDProvider):
         self,
         depth_path: Path,
         output_path: Path | None = None,
+        color_image: Path | None = None,
         base_thickness_mm: float = 3.0,
         relief_height_mm: float = 4.0,
         invert: bool = False,
@@ -221,11 +228,12 @@ class ROCmReliefProvider(ThreeDProvider):
         size_mm: float = 80.0,
         smooth_iterations: int = 0,
     ) -> MeshAsset:
-        """Convert a single-channel depth image into a watertight STL/OBJ mesh.
+        """Convert a single-channel depth image into a watertight STL/OBJ/GLB mesh.
 
         Args:
             depth_path: grayscale image; brighter pixels are higher relief.
             output_path: destination file path (defaults to depth_path.parent / relief.stl).
+            color_image: optional RGB image to bake as a texture on the relief GLB.
             base_thickness_mm: thickness of the flat backing plate.
             relief_height_mm: maximum height of the relief above the base.
             invert: invert the depth image before mapping to height.
@@ -247,20 +255,24 @@ class ROCmReliefProvider(ThreeDProvider):
         z_top = base_thickness_mm + arr * relief_height_mm
 
         vertices = []
+        uvs = []
         # Top surface vertices
         for i in range(H):
             for j in range(W):
                 x = j * pixel_size
                 y = (H - 1 - i) * pixel_size  # flip y so image top is front
                 vertices.append([x, y, z_top[i, j]])
+                uvs.append([j / (W - 1), i / (H - 1)])
         # Bottom surface vertices (z = 0)
         for i in range(H):
             for j in range(W):
                 x = j * pixel_size
                 y = (H - 1 - i) * pixel_size
                 vertices.append([x, y, 0.0])
+                uvs.append([j / (W - 1), i / (H - 1)])
 
         vertices = np.array(vertices, dtype=np.float32)
+        uvs = np.array(uvs, dtype=np.float32)
 
         def vidx(i: int, j: int, top: bool = True) -> int:
             return (0 if top else H * W) + i * W + j
@@ -306,7 +318,23 @@ class ROCmReliefProvider(ThreeDProvider):
             face_keep = keep[faces].all(axis=1)
             faces = faces[face_keep]
 
-        mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=True)
+        mesh = trimesh.Trimesh(
+            vertices=vertices,
+            faces=faces,
+            visual=trimesh.visual.TextureVisuals(uv=uvs),
+            process=True,
+        )
+
+        if color_image is not None:
+            try:
+                color_img = Image.open(color_image).convert("RGB")
+                # Resize to the relief grid resolution so UV maps cleanly 1:1.
+                color_img = color_img.resize((W, H), Image.Resampling.LANCZOS)
+                material = trimesh.visual.material.SimpleMaterial(image=color_img)
+                mesh.visual.material = material
+            except Exception as exc:
+                warnings.warn(f"Could not bake color texture onto relief: {exc}")
+
         if smooth_iterations > 0:
             try:
                 mesh = mesh.smoothed(iterations=smooth_iterations)
@@ -322,6 +350,12 @@ class ROCmReliefProvider(ThreeDProvider):
         if output_path is None:
             output_path = depth_path.parent / "relief.stl"
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Always export a watertight STL for monochrome 3D printing.
         mesh.export(output_path)
 
-        return MeshAsset(mesh_path=output_path)
+        # Export a textured GLB for full-color preview / full-color printing.
+        glb_path = output_path.with_suffix(".glb")
+        mesh.export(glb_path)
+
+        return MeshAsset(mesh_path=glb_path)

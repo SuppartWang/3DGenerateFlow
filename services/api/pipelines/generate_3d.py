@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import numpy as np
 import trimesh
+import warnings
+from PIL import Image
 
 from adapters.factory import get_image_provider, get_3d_provider
 from models import SessionLocal, GenerationJob, JobStatus
@@ -57,10 +60,44 @@ def _scale_to_print_size(mesh: trimesh.Trimesh, target_height_mm: float) -> trim
     return mesh
 
 
+def _apply_planar_texture(mesh: trimesh.Trimesh, image_path: Path) -> trimesh.Trimesh:
+    """Bake an image as a front-projection texture onto the mesh (XY-plane UV).
+
+    This is a simple fallback when the native texture pipeline (Hunyuan3D-2 Paint)
+    cannot run on ROCm. The sides/back will show stretched color, but the front
+    will match the reference image.
+    """
+    try:
+        img = Image.open(image_path).convert("RGB")
+    except Exception as exc:
+        warnings.warn(f"Could not load texture image {image_path}: {exc}")
+        return mesh
+
+    bounds = mesh.bounds
+    xmin, xmax = float(bounds[0][0]), float(bounds[1][0])
+    ymin, ymax = float(bounds[0][1]), float(bounds[1][1])
+    x_range = max(xmax - xmin, 1e-6)
+    y_range = max(ymax - ymin, 1e-6)
+
+    uv = np.array([
+        [(v[0] - xmin) / x_range, (v[1] - ymin) / y_range]
+        for v in mesh.vertices
+    ], dtype=np.float32)
+
+    material = trimesh.visual.material.SimpleMaterial(image=img)
+    mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=material)
+    return mesh
+
+
 def _postprocess_mesh(mesh_path: Path, postprocess_params: dict) -> dict:
-    """Scale mesh to print size, export back to the same path, and return print report."""
+    """Scale mesh to print size, optionally bake texture, export, and return print report."""
     mesh = trimesh.load(mesh_path, force="mesh")
     mesh = _scale_to_print_size(mesh, float(postprocess_params.get("target_height_mm", 80.0)))
+
+    texture_image = postprocess_params.get("texture_image_path")
+    if texture_image:
+        mesh = _apply_planar_texture(mesh, Path(texture_image))
+
     mesh.export(mesh_path)
 
     bounds = mesh.bounding_box.bounds
@@ -114,10 +151,11 @@ def run_generate_3d_pipeline(
         )
 
         # 3. Post-process and compute print metrics.
-        update_job_status(job_id, JobStatus.POSTPROCESSING, status_message="Scaling and computing print metrics")
+        update_job_status(job_id, JobStatus.POSTPROCESSING, status_message="Scaling, texturing and computing print metrics")
         if not mesh_asset.mesh_path.exists():
             result_mesh.write_text("{}\n")  # empty GLB placeholder
 
+        postprocess_params["texture_image_path"] = str(styled_image)
         print_report = _postprocess_mesh(mesh_asset.mesh_path, postprocess_params)
 
         update_job_status(

@@ -63,7 +63,7 @@ def run_generate_relief_pipeline(
         result_mesh = result_path(job_id, "relief.stl")
         three_d_provider = get_3d_provider(output_mode="relief_2d5")
         mesh_asset = three_d_provider.generate_3d_from_images(
-            images=[depth_map],
+            images=[depth_map, styled_image],
             prompt=prompt,
             style=style,
             output_path=result_mesh,
@@ -73,7 +73,7 @@ def run_generate_relief_pipeline(
         # 4. Post-process / print readiness check
         update_job_status(job_id, JobStatus.POSTPROCESSING)
 
-        # Compute simple print metrics from the mesh
+        # Compute simple print metrics from the mesh (GLB is the textured variant, STL is also exported).
         try:
             import trimesh
             mesh = trimesh.load(mesh_asset.mesh_path, force="mesh")
@@ -90,7 +90,7 @@ def run_generate_relief_pipeline(
             job_id,
             JobStatus.COMPLETED,
             result_model_path=_relative_to_cwd(mesh_asset.mesh_path),
-            result_preview_path=_relative_to_cwd(depth_map),
+            result_preview_path=_relative_to_cwd(styled_image),
             multiview_image_paths=[_relative_to_cwd(styled_image), _relative_to_cwd(depth_map)],
             print_report={
                 "volume_cm3": volume / 1000.0,
