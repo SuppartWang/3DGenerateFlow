@@ -20,6 +20,10 @@ from routers import styles, agent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure SQLite parent directory exists before initializing tables.
+    if settings.database_url.startswith("sqlite:///./"):
+        db_file = Path(settings.database_url.replace("sqlite:///./", ""))
+        db_file.parent.mkdir(parents=True, exist_ok=True)
     init_db()
     yield
 
