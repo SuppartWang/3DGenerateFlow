@@ -58,8 +58,16 @@ def get_3d_provider(output_mode: str = "fullcolor_3d") -> ThreeDProvider:
         if output_mode == "relief_2d5":
             return ROCmReliefProvider()
         if USE_HUNYUAN3D:
-            return Hunyuan3D2Provider()
-        return ROCmReliefProvider()
+            try:
+                return Hunyuan3D2Provider()
+            except Exception as exc:  # pragma: no cover
+                import warnings
+
+                warnings.warn(
+                    f"Hunyuan3D-2 provider could not be initialized ({exc}); "
+                    "falling back to configured 3D providers or stub."
+                )
+        # If Hunyuan3D-2 is disabled or failed, fall through to the priority list.
 
     for name in priority:
         if name == "tripo" and settings.tripo_api_key:

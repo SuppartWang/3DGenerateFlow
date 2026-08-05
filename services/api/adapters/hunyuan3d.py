@@ -7,6 +7,7 @@ Hunyuan3D-2 is a Tencent open-source two-stage pipeline:
 Reference: https://github.com/Tencent-Hunyuan/Hunyuan3D-2
 """
 
+import logging
 import os
 import warnings
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import List
 import trimesh
 
 from adapters.base import ThreeDProvider, MeshAsset
+
+logger = logging.getLogger(__name__)
 
 # Optional imports: Hunyuan3D-2 may not be installed if the user only wants 2.5D reliefs.
 try:
@@ -86,13 +89,27 @@ class Hunyuan3D2Provider(ThreeDProvider):
         import torch
 
         dtype = getattr(torch, self.torch_dtype, torch.float16)
+        logger.info(
+            "Loading Hunyuan3D-2 shape pipeline: repo=%s subfolder=%s device=%s dtype=%s cache_dir=%s",
+            self.shape_model_path,
+            self.subfolder,
+            self.device,
+            dtype,
+            self.cache_dir,
+        )
         pipe = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
             self.shape_model_path,
             subfolder=self.subfolder,
             torch_dtype=dtype,
             cache_dir=self.cache_dir,
         )
-        pipe = pipe.to(self.device)
+        if pipe is None:
+            raise RuntimeError(
+                "Hunyuan3D-2 shape pipeline returned None. "
+                "Check the model path / subfolder and that the model is fully downloaded."
+            )
+        # NOTE: Hunyuan3DDiTPipeline.to() is in-place and does NOT return self.
+        pipe.to(self.device)
         self._shape_pipeline = pipe
         return pipe
 
@@ -107,12 +124,22 @@ class Hunyuan3D2Provider(ThreeDProvider):
         import torch
 
         dtype = getattr(torch, self.torch_dtype, torch.float16)
+        logger.info(
+            "Loading Hunyuan3D-2 texture pipeline: repo=%s device=%s dtype=%s cache_dir=%s",
+            self.texture_model_path,
+            self.device,
+            dtype,
+            self.cache_dir,
+        )
         pipe = Hunyuan3DPaintPipeline.from_pretrained(
             self.texture_model_path,
             torch_dtype=dtype,
             cache_dir=self.cache_dir,
         )
-        pipe = pipe.to(self.device)
+        if pipe is None:
+            raise RuntimeError("Hunyuan3D-2 texture pipeline returned None")
+        # NOTE: Hunyuan3DPaintPipeline.to() is in-place and does NOT return self.
+        pipe.to(self.device)
         self._texture_pipeline = pipe
         return pipe
 
