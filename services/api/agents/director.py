@@ -53,6 +53,7 @@ def run_plan(plan: Plan, input_image_path: str, job_id: str | None = None) -> st
             input_image_path=input_image_path,
             style=plan.style_id,
             prompt=plan.user_prompt,
+            postprocess_params=style.postprocess_params | plan.postprocess_params,
         )
 
     return job_id
