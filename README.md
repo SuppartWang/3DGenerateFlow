@@ -1,71 +1,106 @@
 # 3DGenerateFlow
 
-基于一张照片生成可直接 3D 打印的全彩 3D / 2.5D 模型的内容创作工具。内置 **3D Director Agent**：输入一句话需求，Agent 自动选择风格、编排生成流程、生成多视角/深度图并输出可打印模型。
+基于一张照片生成可直接 3D 打印的全彩 3D / 2.5D 模型的内容创作工具。内置 **3D Director Agent**：输入一句话需求，Agent 自动选择风格、编排生成流程、合成多视角图并输出可打印模型。作品以 **Web UI** 形式交付，后端核心推理链路完全在 **AMD Radeon GPU + ROCm** 上本地运行。
+
+---
+
+## 赛道定位
+
+**赛道一：多模态内容创作工具开发**
+
+- 核心创作任务：图生图 / 图生 3D / 2.5D 浮雕 / 全彩 3D 打印模型
+- 应用场景：个人纪念品、宠物/人物手办、IP 衍生品、商业视觉设计、3D 打印内容制作
+- 交付形式：Web UI（React + TypeScript + R3F 前端，FastAPI + Celery 后端）
+
+---
 
 ## 快速开始
 
-1. 安装依赖：
-   ```bash
-   # 后端（推荐用 Docker，也可以本地 Python 环境）
-   cd services/api
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
+### 1. 环境准备（AMD ROCm）
 
-   # 前端
-   cd apps/web
-   npm install
-   npm run dev
-   ```
+```bash
+# 一键安装 ROCm 环境、PyTorch for ROCm、Hunyuan3D-2
+./rocm/setup_rocm.sh
+./rocm/setup_hunyuan3d.sh
+```
 
-2. 启动后端（开发模式使用同步 Celery，无需 Redis）：
-   ```bash
-   cd services/api
-   CELERY_TASK_ALWAYS_EAGER=true \
-   CELERY_RESULT_BACKEND=cache+memory:// \
-   CELERY_TASK_EAGER_PROPAGATES=true \
-   PYTHONPATH=../.. \
-   uvicorn main:app --reload
-   ```
+> 要求：AMD Radeon GPU，ROCm 软件栈，PyTorch 2.5.1+rocm6.1 已通过 `setup_rocm.sh` 安装。
 
-3. 复制环境变量：
-   ```bash
-   cp .env.example .env
-   # 填入：
-   # - LLM_API_KEY / LLM_BASE_URL / LLM_MODEL（Agent 用，OpenAI 兼容）
-   # - TRIPO_API_KEY / MESHY_API_KEY / RODIN_API_KEY（3D 生成用）
-   # - REPLICATE_API_TOKEN / STABILITY_API_KEY（图生图/多视角用）
-   ```
+### 2. 启动后端
 
-   不填 LLM key 时，Agent 会自动退回到规则模式，仍可跑通全流程。
+```bash
+cd services/api
+source .venv/bin/activate
+export USE_ROCM=true
+export USE_HUNYUAN3D=true
+export USE_HUNYUAN3D_MV=true
+export HIP_VISIBLE_DEVICES=0
+export CELERY_TASK_ALWAYS_EAGER=true
+export CELERY_RESULT_BACKEND=cache+memory://
+export CELERY_TASK_EAGER_PROPAGATES=true
+
+PYTHONPATH=../.. uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 3. 启动前端
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+浏览器打开 `http://localhost:5173`。
+
+### 4. 复制环境变量（可选）
+
+```bash
+cp services/api/.env.example services/api/.env
+```
+
+不填写 LLM key 时，Agent 会自动退回到规则模式，仍可跑通全流程。
+
+---
 
 ## 项目结构
 
 ```
 3DGenerateFlow/
-├── apps/web              # React + TypeScript + Tailwind + R3F 前端
-├── services/api          # FastAPI + Celery 后端
-│   ├── agents/           # 3D Director Agent（Planner / Director / Memory / Chat / Skill Registry）
-│   ├── pipelines/        # 3D / 2.5D 生成管线
-│   ├── adapters/         # 云端/本地模型适配层
-│   ├── routers/          # API 路由
-│   └── jobs/             # Celery 异步任务
-├── shared/schemas        # 前后端共享 Pydantic 结构
-├── infra/                # Nginx 等部署配置
-└── docker-compose.yml
+├── apps/web                # React + TypeScript + Tailwind + R3F 前端
+├── services/api            # FastAPI + Celery 后端
+│   ├── agents/             # 3D Director Agent（Planner / Director / Memory / Chat）
+│   ├── pipelines/          # 3D / 2.5D 生成管线
+│   ├── adapters/           # ROCm / Hunyuan3D-2 / Zero123 适配层
+│   ├── routers/            # API 路由
+│   └── jobs/               # Celery 异步任务
+├── shared/schemas          # 前后端共享 Pydantic 结构
+├── rocm/                   # ROCm 与 Hunyuan3D-2 安装脚本
+├── scripts/                # benchmark 与下载脚本
+├── docs/                   # 参赛文档与海报源文件
+└── infra/                  # Nginx 部署配置
 ```
+
+---
 
 ## 主要能力
 
-- **单图上传**：物品 / 宠物 / 人物照片。
-- **AI Director Agent**：一句话生成执行计划，自动选择风格、输出模式、生成步骤。
-- **风格目录**：写实 3D、卡通 3D、低多边形、体素、粘土、素描、2.5D 浮雕、透光浮雕（Lithophane）、纪念币/硬币、剪影浮雕等。
-- **Lazy Canvas**：可视化展示 Agent 编排的 6 步流程，无需手动连线。
-- **多视角 / 深度图分镜**：生成前确认，避免盲盒。
-- **右侧 AI 聊天**：随时用自然语言切换风格、调整参数、重新生成。
-- **打印就绪**：后端规划了壁厚/流形/支撑检查与 3MF/OBJ/STL 导出。
+| 能力 | 说明 | 运行位置 |
+|------|------|----------|
+| **图像上传** | 物品 / 宠物 / 人物照片 | 前端 |
+| **AI Director Agent** | 一句话生成执行计划，自动选择风格、输出模式、生成步骤 | 后端（规则 fallback，可选 LLM） |
+| **风格目录** | 写实 3D、卡通 3D、低多边形、体素、粘土、素描、2.5D 浮雕、透光浮雕、纪念币/硬币、剪影浮雕 | 后端 |
+| **图生图风格化** | Stable Diffusion img2img，最高 1024px | 后端 ROCm |
+| **多视角合成** | Zero123 从正面图生成 front/right/back/left | 后端 ROCm |
+| **3D 生成** | Hunyuan3D-2 / Hunyuan3D-2mv 多视角图生 3D | 后端 ROCm |
+| **2.5D 浮雕** | 本地深度估计 + 高度图 → 带贴图 GLB + 可打印 STL | 后端 ROCm + CPU |
+| **全彩纹理 fallback** | 当 Hunyuan3D-2 纹理模块在 ROCm 上无法编译时，自动用正面投影贴图 | 后端 CPU |
+| **打印就绪检查** | 体积、包围盒、watertight 计算 | 后端 |
+| **3D 预览** | Web UI 内嵌 Three.js 模型查看器 | 前端 |
+| **右侧 AI 聊天** | 用自然语言切换风格、调整参数、重新生成 | 前端 |
 
-## 当前阶段
+---
+
+## 当前实现状态
 
 - [x] 项目脚手架（前后端 + Docker）
 - [x] 单图上传与任务投递接口
@@ -73,38 +108,65 @@
 - [x] 3D Director Agent（LLM / 规则 fallback）
 - [x] 风格目录（3D + 2.5D 多种风格）
 - [x] 3D / 2.5D 异步管线调度
-- [ ] 接入真实云端 3D API（Tripo / Meshy / Rodin）
-- [ ] 接入真实多视角/深度图合成模型
-- [ ] 3D 打印后处理与导出
+- [x] ROCm 本地图生图风格化
+- [x] ROCm 本地深度估计
+- [x] Zero123 多视角合成
+- [x] Hunyuan3D-2 / Hunyuan3D-2mv 本地图生 3D
+- [x] 全彩纹理贴图 fallback
+- [x] 打印报告（体积、尺寸、watertight）
+- [x] 前端 3D 模型预览与下载
+- [ ] 云端 3D API 兜底（Tripo / Meshy / Rodin，可选）
+- [ ] 更复杂的 UV 展开与多视角纹理融合
+
+---
 
 ## ROCm / AMD GPU 本地运行
 
-本项目已针对 **AMD Radeon GPU + ROCm** 进行适配，核心创作链路（风格迁移 → 深度估计 → 2.5D 浮雕生成）可在本地 AMD GPU 上运行，无需依赖闭源 3D API。
+本项目已针对 **AMD Radeon GPU + ROCm** 进行适配，核心创作链路（风格迁移 → 多视角合成 → 3D 生成 → 2.5D 浮雕 → 打印检查）全部可在本地 AMD GPU 上运行，无需依赖闭源 3D API。
 
 快速启动：
 
 ```bash
-# 1. 安装 ROCm 环境与依赖
 ./rocm/setup_rocm.sh
-
-# 2. 启动后端（启用 ROCm 模式）
-cd services/api
-source .venv/bin/activate
-export USE_ROCM=true
-CELERY_TASK_ALWAYS_EAGER=true CELERY_RESULT_BACKEND=cache+memory:// CELERY_TASK_EAGER_PROPAGATES=true PYTHONPATH=../.. uvicorn main:app --reload
-
-# 3. 启动前端
-cd apps/web
-npm install
-npm run dev
+./rocm/setup_hunyuan3d.sh
 ```
+
+然后按上文“启动后端”和“启动前端”操作。
 
 详细说明请见 [`docs/ROCM_GUIDE.md`](docs/ROCM_GUIDE.md)。
 
-### 比赛演示检查点
+---
+
+## 比赛演示检查点
 
 1. 打开 Web UI，右上角显示 **AMD ROCm Ready** 徽章。
-2. 上传一张照片，选择 `relief_embossed` 或 `relief_coin` 风格。
-3. 点击生成，等待本地 ROCm 推理完成。
-4. 下载 `relief.stl` 文件用于 3D 打印。
-5. 运行 `python scripts/benchmark_rocm.py --image <path> --style relief_embossed` 获取性能数据。
+2. 上传一张照片，输入风格描述（如“写实 3D 新娘全身像”）。
+3. 点击“让 AI 规划风格” → “生成模型”。
+4. Lazy Canvas 展示 6 步流程：上传 → 风格设定 → 多视角合成 → 3D 生成 → 打印检查 → 导出。
+5. 等待后端在 AMD GPU 上完成本地推理。
+6. Web UI 自动展示多视角分镜、3D 模型预览和打印报告。
+7. 下载 `model.glb`（全彩 3D）或 `relief.glb` / `relief.stl`（2.5D 浮雕）。
+
+---
+
+## 演示视频脚本
+
+详见 [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)。
+
+---
+
+## 参赛文档
+
+- 项目简介（PDF 源文件）：[`docs/PROJECT_INTRO.md`](docs/PROJECT_INTRO.md)
+- 海报 / PPT（Markdown 源文件）：[`docs/POSTER.md`](docs/POSTER.md)
+
+---
+
+## 性能测试
+
+```bash
+cd services/api
+source .venv/bin/activate
+python scripts/benchmark_rocm.py --image assets/samples/dog.jpg --style relief_embossed
+python scripts/benchmark_rocm.py --image assets/samples/bride.jpg --style realistic_3d
+```
