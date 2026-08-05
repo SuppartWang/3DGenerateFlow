@@ -64,11 +64,12 @@ else
     echo "[2/6] 未检测到 ROCm，尝试安装 ROCm ${ROCM_VERSION} 基础包..."
 
     sudo mkdir -p --mode=0755 /usr/share/keyrings
-    wget -qO - https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/rocm.gpg
+    wget --no-check-certificate -qO - https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/rocm.gpg
 
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VERSION} ${UBUNTU_CODENAME} main" | sudo tee /etc/apt/sources.list.d/rocm.list
-    sudo apt-get update
-    sudo apt-get install -y rocm-dev rocm-hip-runtime rocm-utils rocminfo
+    sudo apt-get update --allow-insecure-repositories || sudo apt-get update
+    sudo apt-get install -y --allow-unauthenticated rocm-dev rocm-hip-runtime rocm-utils rocminfo || \
+        sudo apt-get install -y rocm-dev rocm-hip-runtime rocm-utils rocminfo
 
     # 添加环境变量（当前 shell）
     export PATH="/opt/rocm/bin:$PATH"
@@ -85,12 +86,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 升级 pip
-pip install --upgrade pip setuptools wheel
+pip install --upgrade pip setuptools wheel --trusted-host pypi.org --trusted-host files.pythonhosted.org
 
 # 安装 ROCm 版 PyTorch（根据 Ubuntu 版本自动选择）
 echo "[3/6] 安装 ROCm 版 PyTorch (${PYTORCH_TORCH}) ..."
 pip install ${PYTORCH_TORCH} ${PYTORCH_VISION} ${PYTORCH_AUDIO} \
-    --index-url ${PYTORCH_INDEX}
+    --index-url ${PYTORCH_INDEX} \
+    --trusted-host download.pytorch.org --trusted-host pypi.org --trusted-host files.pythonhosted.org
 
 # 验证
 echo "[3/6] 验证 PyTorch ROCm ..."
@@ -107,10 +109,16 @@ PY
 
 # 4. 安装项目依赖（不含 torch，已单独安装）
 echo "[4/6] 安装项目依赖 ..."
-pip install -r requirements-rocm.txt
+# certifi 用于在系统 CA 缺失时下载 HuggingFace 模型
+pip install certifi --trusted-host pypi.org --trusted-host files.pythonhosted.org
+pip install -r requirements-rocm.txt \
+    --trusted-host pypi.org --trusted-host files.pythonhosted.org
 
 # 5. 预下载模型（可选，建议比赛前执行）
 echo "[5/6] 预下载 HuggingFace 模型到本地缓存 ..."
+# 在系统证书缺失的环境下，使用 certifi 的 CA 包或临时关闭 HTTPS 验证
+export PYTHONHTTPSVERIFY=0
+export REQUESTS_CA_BUNDLE=$(python -c "import certifi; print(certifi.where())" 2>/dev/null || true)
 python - <<'PY'
 import os
 from diffusers import StableDiffusionImg2ImgPipeline
@@ -124,6 +132,7 @@ StableDiffusionImg2ImgPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5",
     cache_dir=cache_dir,
     torch_dtype="auto",
+    safety_checker=None,
 )
 
 print("Downloading Depth Anything v2 small ...")
@@ -135,6 +144,8 @@ pipeline(
 
 print("Model cache dir:", cache_dir)
 PY
+unset PYTHONHTTPSVERIFY
+unset REQUESTS_CA_BUNDLE
 
 # 6. 完成提示
 echo "[6/6] 环境初始化完成。"

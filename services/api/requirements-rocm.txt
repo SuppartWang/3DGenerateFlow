@@ -18,6 +18,7 @@ replicate>=0.32.0
 openai>=1.30.0
 
 # 本地 ROCm 推理依赖
+certifi>=2024.0.0
 diffusers>=0.29.0
 transformers>=4.40.0
 accelerate>=0.30.0
