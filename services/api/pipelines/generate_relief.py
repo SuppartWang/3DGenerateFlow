@@ -61,7 +61,7 @@ def run_generate_relief_pipeline(
         # 3. Generate 2.5D relief mesh from depth map
         update_job_status(job_id, JobStatus.GENERATING_3D, status_message="Building relief mesh")
         result_mesh = result_path(job_id, "relief.stl")
-        three_d_provider = get_3d_provider()
+        three_d_provider = get_3d_provider(output_mode="relief_2d5")
         mesh_asset = three_d_provider.generate_3d_from_images(
             images=[depth_map],
             prompt=prompt,

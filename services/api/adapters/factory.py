@@ -7,7 +7,7 @@ from adapters.image_stub import StubImageProvider
 from adapters.tripo import TripoProvider
 from config import settings
 
-# ROCm providers are imported lazily so the app still starts when torch/diffusers are missing.
+# ROCm / Hunyuan3D-2 providers are imported lazily so the app still starts when heavy deps are missing.
 try:
     from adapters.rocm import (
         ROCmStyleProvider,
@@ -15,11 +15,13 @@ try:
         ROCmReliefProvider,
         rocm_available,
     )
+    from adapters.hunyuan3d import Hunyuan3D2Provider
+
     _HAS_ROCM = True
 except ImportError:  # pragma: no cover
     _HAS_ROCM = False
 
-    def rocm_available() -> bool:
+    def rocm_available() -> bool:  # type: ignore
         return False
 
     class ROCmStyleProvider:  # type: ignore
@@ -31,20 +33,32 @@ except ImportError:  # pragma: no cover
     class ROCmReliefProvider:  # type: ignore
         pass
 
+    class Hunyuan3D2Provider:  # type: ignore
+        pass
+
 
 USE_ROCM = os.environ.get("USE_ROCM", "false").lower() in ("1", "true", "yes")
+USE_HUNYUAN3D = os.environ.get("USE_HUNYUAN3D", "true").lower() in ("1", "true", "yes")
 
 
 def _prefer_rocm() -> bool:
     return USE_ROCM or (_HAS_ROCM and rocm_available())
 
 
-def get_3d_provider() -> ThreeDProvider:
-    """Return the first available 3D provider based on environment and config."""
+def get_3d_provider(output_mode: str = "fullcolor_3d") -> ThreeDProvider:
+    """Return the appropriate 3D provider based on output mode and environment.
+
+    Args:
+        output_mode: "fullcolor_3d" selects a mesh generator (Hunyuan3D-2 / Tripo / stub),
+            "relief_2d5" selects a 2.5D relief generator.
+    """
     priority = [p.strip().lower() for p in settings.threed_provider_priority.split(",")]
 
-    # Local ROCm relief provider takes precedence in competition mode.
     if _prefer_rocm():
+        if output_mode == "relief_2d5":
+            return ROCmReliefProvider()
+        if USE_HUNYUAN3D:
+            return Hunyuan3D2Provider()
         return ROCmReliefProvider()
 
     for name in priority:

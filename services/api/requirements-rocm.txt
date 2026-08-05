@@ -30,3 +30,9 @@ scipy>=1.13.0
 numpy>=1.26.0
 safetensors>=0.4.3
 huggingface-hub>=0.23.0
+
+# Hunyuan3D-2 额外依赖
+xatlas>=0.11.6
+omegaconf>=2.3.0
+einops>=0.7.0
+pymeshlab>=2022.2  # optional, for postprocessing
