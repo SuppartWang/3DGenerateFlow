@@ -52,6 +52,12 @@ npm run dev
 
 浏览器打开 `http://localhost:5173`。
 
+如果前端在 Mac/Windows 上而后端在云端 AMD 实例上，启动时指定后端地址：
+
+```bash
+VITE_API_URL=http://<AMD实例公网IP>:8000 npm run dev
+```
+
 ### 4. 复制环境变量（可选）
 
 ```bash
@@ -104,7 +110,7 @@ cp services/api/.env.example services/api/.env
 
 - [x] 项目脚手架（前后端 + Docker）
 - [x] 单图上传与任务投递接口
-- [x] Lazy Canvas + 向导双模式前端
+- [x] Landing / Director Console / Result 三页式极简 Web UI
 - [x] 3D Director Agent（LLM / 规则 fallback）
 - [x] 风格目录（3D + 2.5D 多种风格）
 - [x] 3D / 2.5D 异步管线调度
@@ -139,13 +145,12 @@ cp services/api/.env.example services/api/.env
 
 ## 比赛演示检查点
 
-1. 打开 Web UI，右上角显示 **AMD ROCm Ready** 徽章。
-2. 上传一张照片，输入风格描述（如“写实 3D 新娘全身像”）。
-3. 点击“让 AI 规划风格” → “生成模型”。
-4. Lazy Canvas 展示 6 步流程：上传 → 风格设定 → 多视角合成 → 3D 生成 → 打印检查 → 导出。
-5. 等待后端在 AMD GPU 上完成本地推理。
-6. Web UI 自动展示多视角分镜、3D 模型预览和打印报告。
-7. 下载 `model.glb`（全彩 3D）或 `relief.glb` / `relief.stl`（2.5D 浮雕）。
+1. 打开 Web UI 首页，右上角显示 **AMD ROCm Ready** 徽章。
+2. 拖拽上传一张照片，选择风格（如 Realistic 3D / Relief Coin），输入描述后点击 **Start Generate**。
+3. 自动进入 **Director Console**，左侧参数面板、中间 6 步故事板时间线、右侧 AI 助手与任务日志实时展示进度。
+4. 等待后端在 AMD GPU 上完成本地推理（Upload → Style → Multiview → 3D → Print Check → Export）。
+5. 完成后自动进入 **Result 页**，展示转盘 3D 预览与打印报告（Volume / Dimensions / Wall Thickness / Watertight）。
+6. 下载 `model.glb`（全彩 3D）或 `relief.stl` / `relief.glb`（2.5D 浮雕）。
 
 ---
 
