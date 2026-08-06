@@ -18,8 +18,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     # 全彩 3D 风格
     StyleTemplate(
         id="realistic_3d",
-        name="写实 3D",
-        description="高还原度、照片级真实感，适合人物、宠物、物品纪念品",
+        name="Realistic 3D",
+        description="High-fidelity, photorealistic look; great for people, pets, and object mementos",
         category="3d",
         output_mode="fullcolor_3d",
         style_prompt="photorealistic 3D model, highly detailed, faithful to reference, soft natural lighting, clean background",
@@ -27,8 +27,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="cartoon_3d",
-        name="卡通 3D",
-        description="大眼睛、圆润比例、高饱和度，适合宠物/儿童/IP 形象",
+        name="Cartoon 3D",
+        description="Big eyes, rounded proportions, saturated colors; perfect for pets, kids, and IP characters",
         category="3d",
         output_mode="fullcolor_3d",
         style_prompt="cute 3D cartoon character, chibi style, smooth rounded shapes, vibrant colors, glossy material, clean background",
@@ -36,8 +36,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="lowpoly_3d",
-        name="低多边形 3D",
-        description="几何切面、低面艺术、适合桌面摆件与装饰",
+        name="Low Poly 3D",
+        description="Geometric faceted surfaces and low-poly art; ideal for desk ornaments and decoration",
         category="3d",
         output_mode="fullcolor_3d",
         style_prompt="low poly 3D art, faceted geometric surfaces, vibrant flat colors, minimal details, stylized",
@@ -45,8 +45,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="voxel_3d",
-        name="体素 3D",
-        description="像素方块堆叠风格，类似 Minecraft/Voxel 艺术",
+        name="Voxel 3D",
+        description="Blocky voxel style reminiscent of Minecraft / voxel art",
         category="stylized_3d",
         output_mode="fullcolor_3d",
         style_prompt="voxel art 3D model, made of small cubes, Minecraft style, bright colors, blocky silhouette",
@@ -54,8 +54,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="clay_3d",
-        name="粘土 3D",
-        description="柔软粘土/陶土质感，适合手作感纪念品",
+        name="Clay 3D",
+        description="Soft clay / pottery texture for a handcrafted keepsake feel",
         category="stylized_3d",
         output_mode="fullcolor_3d",
         style_prompt="claymation 3D model, soft clay texture, fingerprint details, matte material, warm studio lighting",
@@ -63,18 +63,18 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="sketch_3d",
-        name="素描 3D",
-        description="铅笔线条/雕刻白模风格，适合艺术摆件",
+        name="Sketch 3D",
+        description="Pencil-line / sculpted white-model style for artistic display pieces",
         category="stylized_3d",
         output_mode="fullcolor_3d",
         style_prompt="3D model in pencil sketch style, contour lines, monochrome, artistic sculpture look, clean background",
         postprocess_params={"wall_thickness_mm": 2.0, "target_height_mm": 75},
     ),
-    # 2.5D 浮雕风格
+    # 2.5D relief styles
     StyleTemplate(
         id="relief_embossed",
-        name="2.5D 浮雕",
-        description="从照片生成凸起的浮雕，适合做奖牌、纪念牌、冰箱贴",
+        name="Embossed Relief",
+        description="Raised relief from a photo; great for medals, plaques, and fridge magnets",
         category="relief_2d5",
         output_mode="relief_2d5",
         style_prompt="embossed relief, high contrast grayscale depth map, smooth gradients, portrait or object centered, no background",
@@ -82,8 +82,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="relief_lithophane",
-        name="透光浮雕（Lithophane）",
-        description="根据照片厚度变化透光，适合用浅色树脂/PLA 打印",
+        name="Lithophane Relief",
+        description="Thickness-variation translucency; best printed with light resin or PLA",
         category="relief_2d5",
         output_mode="relief_2d5",
         style_prompt="lithophane height map, grayscale, high contrast, portrait centered, backlit ready, no color",
@@ -91,8 +91,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="relief_coin",
-        name="纪念币/硬币浮雕",
-        description="圆形底座、金属质感，适合做纪念币或钥匙扣",
+        name="Coin / Medallion Relief",
+        description="Circular base with a metallic look; suitable for commemorative coins or keychains",
         category="relief_2d5",
         output_mode="relief_2d5",
         style_prompt="coin medallion relief, circular frame, high contrast depth map, metallic look, centered portrait or emblem",
@@ -100,8 +100,8 @@ STYLE_CATALOG: list[StyleTemplate] = [
     ),
     StyleTemplate(
         id="relief_silhouette",
-        name="剪影浮雕",
-        description="强轮廓剪影风格，适合做挂件、装饰板",
+        name="Silhouette Relief",
+        description="Strong outline silhouette style for pendants and decorative plates",
         category="relief_2d5",
         output_mode="relief_2d5",
         style_prompt="silhouette relief, strong outer contour, minimal internal details, flat layers, high contrast depth map",
