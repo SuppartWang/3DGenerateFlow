@@ -157,6 +157,7 @@ cp services/api/.env.example services/api/.env
 
 ## 参赛文档与 PR 模板
 
+- **前端重新设计依据**：[`docs/FRONTEND_REDESIGN_BRIEF.md`](docs/FRONTEND_REDESIGN_BRIEF.md)（功能梳理、API 矩阵、页面结构建议）
 - 英文 Pull Request 描述模板：[`docs/PR_DESCRIPTION.md`](docs/PR_DESCRIPTION.md)
 - 演示视频脚本（3–5 分钟）：[`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
 - 演示视频制作指南（含自动录屏脚本）：[`docs/VIDEO_PRODUCTION.md`](docs/VIDEO_PRODUCTION.md)
