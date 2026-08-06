@@ -29,13 +29,22 @@ except Exception as exc:  # pragma: no cover
     _import_errors.append(f"torch: {exc}")
 
 try:
-    from diffusers import StableDiffusionImg2ImgPipeline, Zero123Pipeline
+    from diffusers import StableDiffusionImg2ImgPipeline
     _HAS_DIFFUSERS = True
-    _HAS_ZERO123 = True
 except Exception as exc:  # pragma: no cover
     _HAS_DIFFUSERS = False
-    _HAS_ZERO123 = False
     _import_errors.append(f"diffusers: {exc}")
+
+try:
+    # Zero123Pipeline import path changed across diffusers versions.
+    try:
+        from diffusers import Zero123Pipeline  # type: ignore
+    except ImportError:
+        from diffusers.pipelines.zero123 import Zero123Pipeline  # type: ignore
+    _HAS_ZERO123 = True
+except Exception as exc:  # pragma: no cover
+    _HAS_ZERO123 = False
+    _import_errors.append(f"zero123: {exc}")
 
 try:
     from transformers import pipeline
