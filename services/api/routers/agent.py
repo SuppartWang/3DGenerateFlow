@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from agents.director import director
@@ -29,7 +29,7 @@ def agent_plan(payload: AgentPlanRequest):
 
 
 @router.post("/execute", response_model=AgentExecuteResponse)
-def agent_execute(payload: AgentExecuteRequest, db: Session = Depends(get_db)):
+def agent_execute(payload: AgentExecuteRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     plan = Plan(**payload.plan.model_dump())
 
     # Create job record first so the UI can poll it immediately
@@ -44,8 +44,14 @@ def agent_execute(payload: AgentExecuteRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(job)
 
-    # Dispatch async task (mock or real depending on LLM key / Celery mode)
-    generate_asset_task.delay(plan.model_dump(), payload.input_image_path, job.id)
+    # Dispatch the long-running generation in the background so the HTTP
+    # response returns immediately (required when Celery runs in eager mode).
+    background_tasks.add_task(
+        generate_asset_task.delay,
+        plan.model_dump(),
+        payload.input_image_path,
+        job.id,
+    )
 
     return AgentExecuteResponse(job_id=job.id, status=JobStatus.PENDING.value)
 

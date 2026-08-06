@@ -3,7 +3,7 @@ import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException
+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
@@ -111,7 +111,7 @@ async def upload(file: UploadFile = File(...)):
 
 
 @app.post("/jobs", response_model=JobResponse)
-def create_job(payload: JobCreateRequest, db: Session = Depends(get_db)):
+def create_job(payload: JobCreateRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     job = GenerationJob(
         status=JobStatus.PENDING.value,
         input_image_path=payload.input_image_path,
@@ -123,7 +123,8 @@ def create_job(payload: JobCreateRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(job)
 
-    generate_3d_task.delay(
+    background_tasks.add_task(
+        generate_3d_task.delay,
         job_id=job.id,
         input_image_path=job.input_image_path,
         style=job.style,
