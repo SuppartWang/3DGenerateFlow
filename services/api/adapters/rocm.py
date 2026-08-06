@@ -18,26 +18,37 @@ from PIL import Image
 from adapters.base import ImageProvider, DepthProvider, ThreeDProvider, MeshAsset
 
 # Optional imports: fail gracefully if the ROCm Python stack is not installed.
+_import_errors: list[str] = []
+
 try:
     import torch
     _HAS_TORCH = True
-except ImportError:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
     _HAS_TORCH = False
     torch = None  # type: ignore
+    _import_errors.append(f"torch: {exc}")
 
 try:
     from diffusers import StableDiffusionImg2ImgPipeline, Zero123Pipeline
     _HAS_DIFFUSERS = True
     _HAS_ZERO123 = True
-except ImportError:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
     _HAS_DIFFUSERS = False
     _HAS_ZERO123 = False
+    _import_errors.append(f"diffusers: {exc}")
 
 try:
     from transformers import pipeline
     _HAS_TRANSFORMERS = True
-except ImportError:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
     _HAS_TRANSFORMERS = False
+    _import_errors.append(f"transformers: {exc}")
+
+
+if _import_errors:
+    import warnings
+
+    warnings.warn("ROCm adapter optional imports failed: " + "; ".join(_import_errors))
 
 
 DEFAULT_HF_CACHE = Path(__file__).resolve().parent.parent / "models" / "hf_cache"
@@ -79,7 +90,9 @@ class ROCmStyleProvider(ImageProvider):
         if self._pipe is not None:
             return self._pipe
         if not _HAS_DIFFUSERS or not _HAS_TORCH:
-            raise RuntimeError("diffusers and torch are required for ROCm style transfer")
+            raise RuntimeError(
+                f"diffusers and torch are required for ROCm style transfer. Import errors: {'; '.join(_import_errors)}"
+            )
 
         dtype = torch.float16 if self.device == "cuda" else torch.float32
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
@@ -156,7 +169,9 @@ class ROCmStyleProvider(ImageProvider):
         if self._zero123_pipe is not None:
             return self._zero123_pipe
         if not _HAS_DIFFUSERS or not _HAS_TORCH or not _HAS_ZERO123:
-            raise RuntimeError("Zero123 pipeline is not available")
+            raise RuntimeError(
+                f"Zero123 pipeline is not available. Import errors: {'; '.join(_import_errors)}"
+            )
 
         dtype = torch.float16 if self.device == "cuda" else torch.float32  # type: ignore
         pipe = Zero123Pipeline.from_pretrained(
@@ -232,7 +247,9 @@ class ROCmDepthProvider(DepthProvider):
         if self._pipe is not None:
             return self._pipe
         if not _HAS_TRANSFORMERS:
-            raise RuntimeError("transformers is required for ROCm depth estimation")
+            raise RuntimeError(
+                f"transformers is required for ROCm depth estimation. Import errors: {'; '.join(_import_errors)}"
+            )
 
         self._pipe = pipeline(
             "depth-estimation",
