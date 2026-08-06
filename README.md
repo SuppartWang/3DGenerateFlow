@@ -155,8 +155,11 @@ cp services/api/.env.example services/api/.env
 
 ---
 
-## 参赛文档
+## 参赛文档与 PR 模板
 
+- 英文 Pull Request 描述模板：[`docs/PR_DESCRIPTION.md`](docs/PR_DESCRIPTION.md)
+- 演示视频脚本（3–5 分钟）：[`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+- 演示视频制作指南（含自动录屏脚本）：[`docs/VIDEO_PRODUCTION.md`](docs/VIDEO_PRODUCTION.md)
 - 项目简介（PDF 源文件）：[`docs/PROJECT_INTRO.md`](docs/PROJECT_INTRO.md)
 - 海报 / PPT（Markdown 源文件）：[`docs/POSTER.md`](docs/POSTER.md)
 
